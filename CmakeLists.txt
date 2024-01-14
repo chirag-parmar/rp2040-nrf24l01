@@ -10,19 +10,21 @@ project(my_project)
 pico_sdk_init()
 
 if (TARGET tinyusb_device)
-    add_executable(hello_usb
-        hello_world.c
+
+    add_executable(rp2040_tx
+        src/main.c
+        src/nrf24l01.c
     )
 
     # pull in common dependencies
-    target_link_libraries(hello_usb pico_stdlib)
+    target_link_libraries(rp2040_tx pico_stdlib hardware_spi)
 
     # enable usb output, disable uart output
-    pico_enable_stdio_usb(hello_usb 1)
-    pico_enable_stdio_uart(hello_usb 0)
+    pico_enable_stdio_usb(rp2040_tx 1)
+    pico_enable_stdio_uart(rp2040_tx 0)
 
     # create map/bin/hex/uf2 file etc.
-    pico_add_extra_outputs(hello_usb)
+    pico_add_extra_outputs(rp2040_tx)
 
 elseif(PICO_ON_DEVICE)
     message(WARNING "not building hello_usb because TinyUSB submodule is not initialized in the SDK")
