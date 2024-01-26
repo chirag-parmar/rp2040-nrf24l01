@@ -48,7 +48,7 @@ nrf24_config_t nrf24_config = {
 	.crc_scheme = CRC_2_BYTE,
 	.int_trigger = RX_INTERRUPT,
 	.rx_mode = true,
-	.auto_ack = false,
+	.auto_ack = true,
 	.retr_count = 1,
 	.retr_delay = RETR_DELAY_4000_US,
 	.datarate = DATARATE_250Kbps,
@@ -86,7 +86,10 @@ int main(void) {
     uint8_t data, length;
     char rx_message[32];
 
-    // nrf24_write_ack("ACK", 4);
+    // pre load a ACK message into the fifo
+    nrf24_write_ack("ACK", strlen("ACK"));
+
+    //start listening
 	nrf24_start_listening();
 	
     while (1) {
@@ -96,13 +99,12 @@ int main(void) {
 			//	Message received, print it
 			message_received = false;
 			
-			// Write ACK message
-			// nrf24_write_ack("ACK", 4);
+			// pre load a ACK message in fifo for the nest receive
+			nrf24_write_ack("ACK", strlen("ACK"));
 			
             length = nrf24_read_message(rx_message);
-			printf("Received message Length: %d\r\n", length);
             rx_message[length] = 0;  
-            printf("Received message Data: %s\r\n",rx_message);
+            printf("Received message: %s\r\n",rx_message);
 		}
     }
 }

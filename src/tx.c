@@ -41,14 +41,14 @@ void print_config(void)
 #define HOP_FREQUENCY 250 // minimum is 250
 
 //	Used in IRQ ISR
-volatile bool message_sent = true;
+volatile bool message_sent = false;
 
 // configure nrf24
 nrf24_config_t nrf24_config = {
 	.crc_scheme = CRC_2_BYTE,
 	.int_trigger = TX_INTERRUPT,
 	.rx_mode = false,
-	.auto_ack = false,
+	.auto_ack = true,
 	.retr_count = 1,
 	.retr_delay = RETR_DELAY_4000_US,
 	.datarate = DATARATE_250Kbps,
@@ -83,40 +83,32 @@ int main(void) {
 
     print_config();
 
-    uint8_t data, iterator = 0;
+    uint8_t data, length, iterator = 0;
     char tx_message[32], rx_message[32];
-	snprintf(tx_message, 32, "Transmitted packet %d", iterator);	// Copy string into array
 
+	// send the first packet
+	snprintf(tx_message, 32, "Transmitted packet %d", iterator);	// Copy string into array
 	nrf24_send_message(tx_message, strlen(tx_message), nrf24_config.auto_ack);;
 	
     while (1) {
 		
 		nrf24_read_register(R_REGISTER | STATUS, &data, 1);
-		// if ((data & (1 << MAX_RT))) {
-		// 	printf("Maximum RT reached\r\n");
-		// 	data = (1 << MAX_RT);
-		// 	nrf24_write(STATUS, &data, 1);
-		// 	nrf24_write(FLUSH_TX, 0, 0);
-
-		// 	snprintf(tx_message, 32, "TX: %d", i);	// Copy string into array
-
-		// 	//	Send message as response
-		// 	nrf24_send_message(tx_message, nrf24_config.auto_ack);
-		// }
-
 
 		if (message_sent) {
             message_sent = false;
 
-            printf("Message sent %d\r\n", iterator);
+			// read the received ACK packet
+			length = nrf24_read_message(rx_message);
+			rx_message[length] = 0;
+			printf("Message %d Sent: %s\r\n", iterator, rx_message);
 
+			// send a new packet
 			snprintf(tx_message, 32, "Transmitted packet %d", iterator);	// Copy string into array
-
-			sleep_ms(1000);
-
-			//	Send message as response
+			// Send message as response
 			nrf24_send_message(tx_message, strlen(tx_message), nrf24_config.auto_ack);
 
+			// sleep for five seconds
+			sleep_ms(5000);
 			iterator++;
 		}
     }
