@@ -26,8 +26,8 @@ uint8_t nrf24_read_register(uint8_t register_address, uint8_t* dst, unsigned int
 	uint8_t status;
 	
 	csn_low;
-	spi_write_read_blocking(spi1, &register_address, &status, 1);
-	if (bytes > 0) spi_read_blocking(spi1, 0, dst, bytes);
+	spi_write_read_blocking(NRF24_SPI, &register_address, &status, 1);
+	if (bytes > 0) spi_read_blocking(NRF24_SPI, 0, dst, bytes);
 	csn_high;
 	
 	return status;
@@ -38,8 +38,8 @@ uint8_t nrf24_write_read_register(uint8_t register_address, uint8_t* src, uint8_
 	uint8_t status;
 	
 	csn_low;
-	spi_write_read_blocking(spi1, &register_address, &status, 1);
-	if (bytes > 0) spi_write_read_blocking(spi1, src, dst, bytes);
+	spi_write_read_blocking(NRF24_SPI, &register_address, &status, 1);
+	if (bytes > 0) spi_write_read_blocking(NRF24_SPI, src, dst, bytes);
 	csn_high;
 	
 	return status;
@@ -50,14 +50,14 @@ uint8_t nrf24_write_register(uint8_t register_address, uint8_t* src, unsigned in
 	uint8_t status;
 	
 	csn_low;
-	spi_write_read_blocking(spi1, &register_address, &status, 1);
-	if (bytes > 0)spi_write_blocking(spi1, src, bytes);
+	spi_write_read_blocking(NRF24_SPI, &register_address, &status, 1);
+	if (bytes > 0)spi_write_blocking(NRF24_SPI, src, bytes);
 	csn_high
 
 	return status;
 }
 
-void nrf24_init(uint8_t csn, uint8_t ce) {
+void nrf24_init(uint8_t sck, uint8_t mosi, uint8_t miso, uint8_t csn, uint8_t ce, uint8_t irq) {
 
 	gpio_init(ce);
     gpio_set_dir(ce, GPIO_OUT);
@@ -67,16 +67,19 @@ void nrf24_init(uint8_t csn, uint8_t ce) {
     gpio_set_dir(csn, GPIO_OUT);
 	gpio_put(csn, 1);
 
+	gpio_set_irq_enabled(irq, GPIO_IRQ_EDGE_FALL, true);
+	irq_set_enabled(IO_IRQ_BANK0, true);
+
 	//save pins
 	ce_pin = ce;
 	csn_pin = csn;
 	
 	// Initialize SPI
-	spi_init(spi1, 8000 * 1000);
-	spi_set_format(spi1, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
-    gpio_set_function(12, GPIO_FUNC_SPI);
-    gpio_set_function(10, GPIO_FUNC_SPI);
-    gpio_set_function(11, GPIO_FUNC_SPI);
+	spi_init(NRF24_SPI, 16000 * 1000);
+	spi_set_format(NRF24_SPI, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    gpio_set_function(sck, GPIO_FUNC_SPI);
+    gpio_set_function(miso, GPIO_FUNC_SPI);
+    gpio_set_function(mosi, GPIO_FUNC_SPI);
 
     // // Make the SPI pins available to picotool
     // bi_decl(bi_4pins_with_func(12, 11, 10, GPIO_FUNC_SPI));
@@ -182,9 +185,9 @@ void nrf24_write_ack(uint8_t* ack_data, uint8_t length) {
 	// ACK packet
 	nrf24_write_register(W_ACK_PAYLOAD, ack_data, length);
 
-	// // write a null character
-	// data = 0
-	// spi_write_blocking(spi1, &data, 1);
+	// write a null character
+	// uint8_t data = 0;
+	// spi_write_blocking(NRF24_SPI, &data, 1);
 }
 
 void nrf24_state(uint8_t state) {
@@ -195,46 +198,45 @@ void nrf24_state(uint8_t state) {
 	switch (state)
 	{
 		case POWERUP:
-		// Check if already powered up
-		if (!(config_register & (1 << PWR_UP)))
-		{
-			data = config_register | (1 << PWR_UP);
-			nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
-			// 1.5ms from POWERDOWN to start up
-			sleep_ms(2);
-		}
-		break;
+			// Check if already powered up
+			if (!(config_register & (1 << PWR_UP)))
+			{
+				data = config_register | (1 << PWR_UP);
+				nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
+				// 1.5ms from POWERDOWN to start up
+				sleep_ms(2);
+			}
+			break;
 		case POWERDOWN:
-		data = config_register & ~(1 << PWR_UP);
-		nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
-		break;
+			data = config_register & ~(1 << PWR_UP);
+			nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
+			break;
 		case RECEIVE:
-		data = config_register | (1 << PRIM_RX);
-		nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
-		// Clear STATUS register
-		data = (1 << RX_DR) | (1 << TX_DS) | (1 << MAX_RT);
-		nrf24_write_register(W_REGISTER | STATUS, &data, 1);
-		break;
+			data = config_register | (1 << PRIM_RX);
+			nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
+			// Clear STATUS register
+			data = (1 << RX_DR) | (1 << TX_DS) | (1 << MAX_RT);
+			nrf24_write_register(W_REGISTER | STATUS, &data, 1);
+			break;
 		case TRANSMIT:
-		data = config_register & ~(1 << PRIM_RX);
-		nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
-		break;
+			data = config_register & ~(1 << PRIM_RX);
+			nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
+			break;
 		case STANDBY1:
-		ce_low;
-		break;
+			ce_low;
+			break;
 		case STANDBY2:
-		data = config_register & ~(1 << PRIM_RX);
-		nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
-		ce_high;
-		sleep_us(150);
-		break;
+			data = config_register & ~(1 << PRIM_RX);
+			nrf24_write_register(W_REGISTER | CONFIG, &data, 1);
+			ce_high;
+			sleep_us(150);
+			break;
 	}
 }
 
-void nrf24_start_listening(bool auto_ack) {
+void nrf24_start_listening() {
 
 	nrf24_state(RECEIVE);				// Receive mode
-	if (auto_ack) nrf24_write_ack("ACK", 3);	// Write acknowledgment
 	ce_high;
 	sleep_us(150);						// Settling time
 }
@@ -249,9 +251,9 @@ void nrf24_send_message(uint8_t *tx_message, uint8_t length, bool auto_ack) {
 	if (auto_ack) nrf24_write_register(W_TX_PAYLOAD, tx_message, length);
 	else  nrf24_write_register(W_TX_PAYLOAD_NOACK, tx_message, length);
 
-	// // write a null character
-	// data = 0
-	// spi_write_blocking(spi1, &data, 1);
+	// write a null character
+	// data = 0;
+	// spi_write_blocking(NRF24_SPI, &data, 1);
 	
 	// Send message by pulling CE high for more than 10us
 	ce_high;

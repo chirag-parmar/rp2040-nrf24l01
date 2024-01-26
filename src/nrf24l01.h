@@ -9,6 +9,11 @@
 #define STANDBY1	5
 #define STANDBY2	6
 
+#ifndef NRF24_SPI
+#warning "Setting default SPI instance to spi1"
+#define NRF24_SPI spi1
+#endif
+
 typedef enum {          // en|2byte?
     NO_CRC      = 0x00, // 0b00
     CRC_1_BYTE  = 0x02, // 0b10
@@ -81,12 +86,12 @@ uint8_t nrf24_write_register(uint8_t register_address, uint8_t* src, unsigned in
 
 uint8_t rpd_status(void);
 
-void nrf24_init(uint8_t csn, uint8_t ce);
+void nrf24_init(uint8_t sck, uint8_t mosi, uint8_t miso, uint8_t csn, uint8_t ce, uint8_t irq);
 void nrf24_configure(nrf24_config_t* config);
 void nrf24_switch_channel(uint8_t channel);
 void nrf24_state(uint8_t state);
 
-void nrf24_start_listening(bool auto_ack);
+void nrf24_start_listening();
 unsigned int nrf24_available(void);
 uint8_t nrf24_read_message(uint8_t* rx_message);
 
