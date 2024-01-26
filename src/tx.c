@@ -107,8 +107,6 @@ int main(void) {
 			// Send message as response
 			nrf24_send_message(tx_message, strlen(tx_message), nrf24_config.auto_ack);
 
-			// sleep for five seconds
-			sleep_ms(5000);
 			iterator++;
 		}
     }
