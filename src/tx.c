@@ -83,9 +83,9 @@ int main(void) {
 
     print_config();
 
-    uint8_t data;
+    uint8_t data, iterator = 0;
     char tx_message[32], rx_message[32];
-	snprintf(tx_message, 32, "Transmitted packet");	// Copy string into array
+	snprintf(tx_message, 32, "Transmitted packet %d", iterator);	// Copy string into array
 
 	nrf24_send_message(tx_message, strlen(tx_message), nrf24_config.auto_ack);;
 	
@@ -108,15 +108,16 @@ int main(void) {
 		if (message_sent) {
             message_sent = false;
 
-            printf("Message sent\r\n");
+            printf("Message sent %d\r\n", iterator);
 
-			// printf("Ack Packet Length: %d\r\n", nrf24_read_message(rx_message));
-            // printf("Ack Packet Data: %s\r\n", rx_message);
+			snprintf(tx_message, 32, "Transmitted packet %d", iterator);	// Copy string into array
 
 			sleep_ms(1000);
 
 			//	Send message as response
 			nrf24_send_message(tx_message, strlen(tx_message), nrf24_config.auto_ack);
+
+			iterator++;
 		}
     }
 }
