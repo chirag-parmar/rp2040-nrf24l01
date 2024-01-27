@@ -14,11 +14,13 @@ if (TARGET tinyusb_device)
     add_executable(rp2040_tx
         src/tx.c
         src/nrf24l01.c
+        src/lfsr.c
     )
 
     add_executable(rp2040_rx
         src/rx.c
         src/nrf24l01.c
+        src/lfsr.c
     )
 
     # pull in common dependencies
