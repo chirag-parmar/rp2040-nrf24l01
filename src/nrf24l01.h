@@ -98,4 +98,6 @@ uint8_t nrf24_read_message(uint8_t* rx_message);
 void nrf24_send_message(uint8_t *tx_message, uint8_t length, bool auto_ack);
 void nrf24_write_ack(uint8_t* ack_data, uint8_t length);
 
+void nrf24_print_config();
+
 #endif /*_NRF24L01_H*/
