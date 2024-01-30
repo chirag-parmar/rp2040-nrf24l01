@@ -16,6 +16,7 @@
 #include <string.h>
 
 #define HOP_FREQUENCY 250 // minimum is 250
+#define HOP_PERIOD (1000000/HOP_FREQUENCY) // hop period in us
 
 //	Used in IRQ ISR
 volatile bool nrf24_interrupt_trigger = false;
@@ -25,7 +26,7 @@ nrf24_config_t nrf24_config = {
 	.crc_scheme = CRC_2_BYTE,
 	.int_trigger = RX_INTERRUPT,
 	.rx_mode = true,
-	.auto_ack = true,
+	.auto_ack = false,
 	.retr_count = 1,
 	.retr_delay = RETR_DELAY_4000_US,
 	.datarate = DATARATE_250Kbps,
@@ -39,6 +40,11 @@ nrf24_config_t nrf24_config = {
 
 void gpio_callback(uint gpio, uint32_t events) {
 	if(gpio == 13 && (events & GPIO_IRQ_EDGE_FALL) > 0) nrf24_interrupt_trigger = true;
+}
+
+bool timer_callback(repeating_timer_t *t) {
+    nrf24_switch_channel(lfsr_shift()%125);
+    return true;
 }
 
 int main(void) {	
@@ -55,10 +61,14 @@ int main(void) {
 	nrf24_configure(&nrf24_config);
     gpio_set_irq_callback(gpio_callback);
 
-
-	// setup the first channel
+	// setup LFSR for FHSS
 	lfsr_seed(0x74);
 	nrf24_switch_channel(0x74);
+
+	// setup timer for FHSS
+	repeating_timer_t timer;
+    // cancelled = cancel_repeating_timer(&timer);
+    // printf("cancelled... %d\n", cancelled);
 
     //power up the nrf24
 	nrf24_state(POWERUP);
@@ -67,10 +77,7 @@ int main(void) {
 
     uint8_t data, length, fifo;
     char rx_message[32], tx_message[32];
-
-    // pre load a ACK message into the fifo
-    snprintf(tx_message, 32, "ACK: %d", rpd_status());
-    nrf24_write_ack(tx_message, strlen(tx_message));
+    bool hop_started;
 
     //start listening
 	nrf24_start_listening();
@@ -84,56 +91,26 @@ int main(void) {
         if ((fifo & (1 << RX_FULL)) > 0) {
             printf("Receive FIFO full, FIFO_STATUS %02x\r\n", fifo);
             
-            // if tx fifo is empty and the rx fifo is full, it is probably because 
-            // tx fifo didn't have any ack packets to send but it kept receiving new packets
-            if ((fifo & (1 << TX_EMPTY)) > 0) {
-                nrf24_state(STANDBY1);
+            nrf24_state(STANDBY1);
 
-                // flush rx fifo
-                nrf24_write_register(W_REGISTER | FLUSH_RX, 0, 0);
+            // flush rx fifo
+            nrf24_write_register(W_REGISTER | FLUSH_RX, 0, 0);
 
-                // pre load a ACK message into the tx fifo
-                snprintf(tx_message, 32, "ACK: %d", rpd_status());
-                nrf24_write_ack(tx_message, strlen(tx_message));
-
-                nrf24_start_listening();
-            }
+            nrf24_start_listening();
         }
 
 		if (nrf24_interrupt_trigger) {
+            length = nrf24_read_message(rx_message);
+            rx_message[length] = 0;  
+            printf("Received message: %s\r\n",rx_message);
 
-            data = 0;
-            nrf24_read_register(R_REGISTER | STATUS, &data, 1);
-
-            // handle receive interrupt
-            if ((data & (1 << RX_DR)) > 0) {
-                // pre load a ACK message in fifo for the next receive
-                snprintf(tx_message, 32, "ACK: %d", rpd_status());
-                nrf24_write_ack(tx_message, strlen(tx_message));
-                
-                length = nrf24_read_message(rx_message);
-                rx_message[length] = 0;  
-                printf("Received message: %s\r\n",rx_message);
-
-                // flush rx fifo
-                nrf24_write_register(W_REGISTER | FLUSH_RX, 0, 0);
-
-                // nrf24_switch_channel((lfsr_shift() & 0x7f) % 125);
+            if (strstr(rx_message, "Transmitted packet 255")) {
+                nrf24_print_config();
+                nrf24_switch_channel(lfsr_shift()%125);
             }
-            
-            // handle transmit interrupt
-            // if ((data & (1 << TX_DS)) > 0) {
-
-            // }
-            
-            // // handle maximum retransimissions interrupt
-            // if ((data & (1 << MAX_RT)) > 0){
-
-            // }
             
 			//	Message received, print it
 			nrf24_interrupt_trigger = false;
-			
 		}
     }
 }
