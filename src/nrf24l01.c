@@ -287,3 +287,29 @@ uint8_t nrf24_read_message(uint8_t* rx_message) {
 	
 	return length;
 }
+
+void nrf24_print_config(void)
+{
+	uint8_t data;
+	printf("Startup successful\r\n\r\n nRF24L01+ configured as:\r\n");
+	printf("-------------------------------------------\r\n");
+	nrf24_read_register(R_REGISTER | CONFIG,&data,1);
+	printf("CONFIG		0x%x\r\n",data);
+	nrf24_read_register(R_REGISTER | EN_AA,&data,1);
+	printf("EN_AA		0x%x\r\n",data);
+	nrf24_read_register(R_REGISTER | EN_RXADDR,&data,1);
+	printf("EN_RXADDR	0x%x\r\n",data);
+	nrf24_read_register(R_REGISTER | SETUP_RETR,&data,1);
+	printf("SETUP_RETR	0x%x\r\n",data);
+	nrf24_read_register(R_REGISTER | RF_CH,&data,1);
+	printf("RF_CH		0x%x\r\n",data);
+	nrf24_read_register(R_REGISTER | RF_SETUP,&data,1);
+	printf("RF_SETUP	0x%x\r\n",data);
+	nrf24_read_register(R_REGISTER | STATUS,&data,1);
+	printf("STATUS		0x%x\r\n",data);
+	nrf24_read_register(R_REGISTER | FEATURE,&data,1);
+	printf("FEATURE		0x%x\r\n",data);
+	nrf24_read_register(R_REGISTER | FIFO_STATUS,&data,1);
+	printf("FIFO		0x%x\r\n",data);
+	printf("-------------------------------------------\r\n\r\n");
+}
