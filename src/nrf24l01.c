@@ -168,9 +168,7 @@ void nrf24_configure(nrf24_config_t* config) {
 }
 
 void nrf24_switch_channel(uint8_t channel) {
-	nrf24_state(POWERDOWN);
 	nrf24_write_register(W_REGISTER | RF_CH, &channel, 1);
-	nrf24_state(POWERUP);
 }
 
 uint8_t rpd_status(void) {

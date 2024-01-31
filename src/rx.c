@@ -15,11 +15,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#define HOP_FREQUENCY 250 // minimum is 250
+#define HOP_FREQUENCY 50 // maximum is 1000Hz
 #define HOP_PERIOD (1000000/HOP_FREQUENCY) // hop period in us
 
 //	Used in IRQ ISR
 volatile bool nrf24_interrupt_trigger = false;
+volatile bool hop_flag = false;
 
 // configure nrf24
 nrf24_config_t nrf24_config = {
@@ -43,7 +44,7 @@ void gpio_callback(uint gpio, uint32_t events) {
 }
 
 bool timer_callback(repeating_timer_t *t) {
-    nrf24_switch_channel(lfsr_shift()%125);
+    hop_flag = true;
     return true;
 }
 
@@ -77,7 +78,7 @@ int main(void) {
 
     uint8_t data, length, fifo;
     char rx_message[32], tx_message[32];
-    bool hop_started;
+    bool hop_started = false;
 
     //start listening
 	nrf24_start_listening();
@@ -99,15 +100,20 @@ int main(void) {
             nrf24_start_listening();
         }
 
+        if (hop_flag) {
+            nrf24_switch_channel(lfsr_shift()%125);
+            hop_flag = false;
+        }
+
 		if (nrf24_interrupt_trigger) {
+            if (!hop_started) {
+                add_repeating_timer_us((-1)*HOP_PERIOD, timer_callback, NULL, &timer);
+                hop_started = true;
+            }
+            
             length = nrf24_read_message(rx_message);
             rx_message[length] = 0;  
             printf("Received message: %s\r\n",rx_message);
-
-            if (strstr(rx_message, "Transmitted packet 255")) {
-                nrf24_print_config();
-                nrf24_switch_channel(lfsr_shift()%125);
-            }
             
 			//	Message received, print it
 			nrf24_interrupt_trigger = false;

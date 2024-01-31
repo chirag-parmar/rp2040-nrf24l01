@@ -16,12 +16,13 @@
 #include <string.h>
 #include <time.h>
 
-#define INTER_PACKET_DELAY 1
-#define HOP_FREQUENCY 250 // minimum is 250
+
+#define HOP_FREQUENCY 50 // minimum is 250
 #define HOP_PERIOD (1000000/HOP_FREQUENCY)
 
 //	Used in IRQ ISR
 volatile bool nrf24_interrupt_trigger = false;
+volatile bool hop_flag = false;
 
 // configure nrf24
 nrf24_config_t nrf24_config = {
@@ -44,10 +45,10 @@ void gpio_callback(uint gpio, uint32_t events) {
 	if(gpio == 13 && (events & GPIO_IRQ_EDGE_FALL) > 0) nrf24_interrupt_trigger = true;
 }
 
-// bool timer_callback(struct repeating_timer *t) {
-// 	nrf24_switch_channel(lfsr_shift()%125);
-// 	return true;
-// }
+bool timer_callback(struct repeating_timer *t) {
+	hop_flag = true;
+	return true;
+}
 
 int main(void) {	
 	
@@ -79,6 +80,7 @@ int main(void) {
 
     uint8_t data, length, iterator = 0;
     char tx_message[32], rx_message[32];
+	bool hop_started = false;
 	// uint64_t start_time, ping;
 
 	// send the first packet
@@ -88,16 +90,20 @@ int main(void) {
     while (1) {
 		
 		if (nrf24_interrupt_trigger) {
+			if (!hop_started) {
+				add_repeating_timer_us((-1)*HOP_PERIOD, timer_callback, NULL, &timer);
+                hop_started = true;
+			}
+
+			if (hop_flag) {
+				nrf24_switch_channel(lfsr_shift()%125);
+				hop_flag = false;
+			}
+
 			printf("Message %d sent\r\n", iterator);
-			if (iterator == 255) {
-                nrf24_switch_channel(lfsr_shift()%125);
-            }
 
 			// increment the iterator 
 			iterator++;
-
-			sleep_ms(INTER_PACKET_DELAY);
-			// nrf24_switch_channel(iterator % 2 == 0 ? 0x74 : 0x44);
 
 			snprintf(tx_message, 32, "Transmitted packet %d", iterator);	// Copy string into array
 			nrf24_send_message(tx_message, strlen(tx_message), nrf24_config.auto_ack);
